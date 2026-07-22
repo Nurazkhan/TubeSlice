@@ -41,3 +41,12 @@ class UserService:
     def get_all_users(self) -> list[User]:
         users = self.__userRepository.get_all_users()
         return users
+    
+    def delete_user_by_id(self, id:str)-> UserOutput:
+        user = self.__userRepository.delete_user_by_id(id)
+        return UserOutput(
+            id= user.id,
+                first_name=user.first_name,
+                last_name= user.last_name,
+                email=user.email,
+                role= user.role)

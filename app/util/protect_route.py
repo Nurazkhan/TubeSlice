@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 security_scheme = HTTPBearer()
 
 def get_current_user(session: Session = Depends(get_db), authorization: Annotated[HTTPAuthorizationCredentials, Depends(security_scheme)] = None) -> UserOutput:
-    auth_exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authorization error')
+    auth_exc = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Authorization error, token expired or wrong')
 
     if not authorization:
         raise auth_exc
@@ -28,7 +28,7 @@ def get_current_user(session: Session = Depends(get_db), authorization: Annotate
                 first_name=user.first_name,
                 last_name= user.last_name,
                 email=user.email,
-                isAdmin= user.isAdmin
+                role= user.role
             )
         except Exception as error:
             print(error)

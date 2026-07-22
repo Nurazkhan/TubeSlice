@@ -5,6 +5,7 @@ from app.routers.auth import router
 from app.db.schema.user import UserOutput
 from app.util.protect_route import get_current_user
 from app.routers.users import users_router
+from app.routers.download import download_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -14,6 +15,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan= lifespan)
 app.include_router(router)
 app.include_router(users_router)
+app.include_router(download_router)
 @app.get('/')
 def home():
     return {'message': 'hello world! \n it is Tube Slice!'}

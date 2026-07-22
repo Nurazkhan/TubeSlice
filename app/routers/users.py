@@ -15,7 +15,12 @@ def all_users(session: Session = Depends(get_db))-> list[UserOutput] | dict[str,
                 first_name=user.first_name,
                 last_name= user.last_name,
                 email=user.email,
-                isAdmin= user.isAdmin
+                role= user.role
             ) for user in users]
     else:
         return {'message': 'there are no users in database'}
+
+@users_router.delete('/delete')
+def delete_user(id: str, session: Session = Depends(get_db) ) -> UserOutput:
+    user = UserService(session=session).delete_user_by_id(id)
+    return user

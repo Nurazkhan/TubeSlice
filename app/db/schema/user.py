@@ -12,7 +12,7 @@ class UserOutput(BaseModel):
     first_name: str
     last_name: str
     email: str
-    isAdmin: bool
+    role: str
 
 class UserInUpdate(BaseModel):
     id: str
@@ -20,7 +20,7 @@ class UserInUpdate(BaseModel):
     last_name: Union[str, None] = None
     email: Union[EmailStr, None] = None
     password: Union[str, None] = None
-    isAdmin: Union[bool, None] = None
+    role: Union[str, None] = None
 
 class UserInLogin(BaseModel):
     email: EmailStr

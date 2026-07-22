@@ -25,4 +25,10 @@ class UserRepository(BaseRepository):
         users = self.session.query(User).all()
         return users
     
+    def delete_user_by_id(self, id:str) -> User:
+        user = self.session.query(User).filter_by(id=id).first()
+        self.session.delete(user)
+        self.session.commit()
+        return user
+    
     
