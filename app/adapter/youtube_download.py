@@ -5,11 +5,12 @@ from typing import Union
 class YoutubeAdapter:
     @staticmethod
     def download(url: str, quality: str = '360p') -> str:
-        path = f'../downloads/%(title)s.%(ext)s'
+        path = f'app/downloads/%(title)s.%(ext)s'
         ydl_opts: dict[str, Union[str, bool]] = {
             'format': f'{quality}',
             'outtmpl': path,
             'quiet': False,
+            'merge_output_format': 'mp4'
         }
 
 
@@ -32,5 +33,9 @@ class YoutubeAdapter:
                 info = ydl.extract_info(url, download= False)
                 return info
         except ExtractorError as e:
-            return f'Extraction error: {e}'
+            print("ExtractorError: ", e)
+            return None
+        except DownloadError as e:
+            print("Download Error: ",e)
+            return None
 
