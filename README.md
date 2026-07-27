@@ -9,3 +9,5 @@ running docker
 `pip3 install yt-dlp[default]`
 
 `uvicorn main:app --port 8080 --reload`
+
+`pip3 install redis celery`

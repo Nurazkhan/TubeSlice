@@ -3,24 +3,26 @@ from fastapi.responses import FileResponse
 from app.db.schema.download import downloadIn,downloadOutput
 from app.service.download_service import DownloadService
 from app.adapter.youtube_download import YoutubeAdapter
+from app.tasks.downloadTask import download_process
 
 from sqlalchemy.orm import Session
 from app.config.database import get_db
 
 
-download_router = APIRouter()
+download_router = APIRouter(tags=['Download'])
 
-def download_process(url: str, format: str, session: Session, id: str):
-    YoutubeAdapter.download(url,format)
-    DownloadService(session=session).change_status(id, "Downloaded")
+# def download_process(url: str, format: str, session: Session, id: str):
+#     DownloadService(session=session).change_status(id, "Processing")
+#     YoutubeAdapter.download(url,format)
+#     DownloadService(session=session).change_status(id, "Downloaded")
 
 
 @download_router.post('/download')
 def download_from_url(payload: downloadIn, background_tasks: BackgroundTasks , session: Session = Depends(get_db)):
     
-    download_orm = DownloadService(session=session).download_video(payload)
-    download_scheme = downloadOutput.model_validate(download_orm)
-    background_tasks.add_task(lambda : download_process(payload.url, payload.format, session, download_scheme.id))
+    download_scheme = DownloadService(session=session).log_download(payload)
+    download_process.delay(url =payload.url, format = payload.format, id = download_scheme.id)
+    # background_tasks.add_task(lambda : download_process(payload.url, payload.format, session, download_scheme.id))
     return {'message': f'download info: {download_scheme}'}
 
 @download_router.get('/download/{id}')

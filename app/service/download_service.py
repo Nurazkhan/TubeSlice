@@ -7,7 +7,7 @@ class DownloadService:
     def __init__(self, session : Session):
         self.__downloadRepository = downloadRepository(session = session)
 
-    def download_video(self, payload: downloadIn ):
+    def log_download(self, payload: downloadIn ) -> downloadOutput:
         try:
             info = YoutubeAdapter.get_info(payload.url)
             if not info:
@@ -23,7 +23,8 @@ class DownloadService:
                 status= 'Accepted',
                 format = payload.format
             )
-            return self.__downloadRepository.download(payload_to_scheme)
+            result = self.__downloadRepository.download(payload_to_scheme)
+            return downloadOutput.model_validate(result)
 
         except Exception as e:
             import traceback
