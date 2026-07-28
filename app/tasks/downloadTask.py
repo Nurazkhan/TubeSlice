@@ -5,8 +5,12 @@ from app.worker import celery_app
 
 
 @celery_app.task
-def download_process(url: str, format: str, id: str):
+def download_process(url: str, format: str, download_id: str, segment_id: str):
     with SessionLocal() as session:
-        DownloadService(session=session).change_status(id, "Processing")
-        YoutubeAdapter.download(url,format)
-        DownloadService(session=session).change_status(id, "Downloaded")
+        
+        path = f'app/downloads/segments/{segment_id}.%(ext)s'
+        DownloadService(session=session).change_status(download_id, "Processing")
+        DownloadService(session = session).change_segment_status(segment_id, "Processing")
+        YoutubeAdapter.download(url, path, format)
+        DownloadService(session=session).change_status(download_id, "Downloaded")
+        DownloadService(session= session).change_segment_status(segment_id, "Processing")

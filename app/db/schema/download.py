@@ -1,17 +1,44 @@
 from pydantic import BaseModel, ConfigDict
 
+
+    
+class segmentOutput(BaseModel):
+    model_config = ConfigDict(from_attributes= True)
+
+    id: str
+    download_id: str
+    start_time: int
+    end_time: int
+    status: str
+    format: str
+    
+    createdAt: float
+
+class segmentIn(BaseModel):
+    model_config = ConfigDict(from_attributes= True)
+    download_id: str
+    start_time: int
+    end_time: int
+    format: str
+
+
+   
+
 class downloadIn(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     url: str
     format: str
+
+class downloadSegmentIn(BaseModel):
+    url: str
+    segments: list[segmentIn]
 
 class downloadInstanceIn(BaseModel):
     title: str
     duration: int
     uploader: str
     youtube_url: str
-    download_url: str
     status: str
-    format: str
 
 class downloadOutput(BaseModel):
     model_config = ConfigDict(from_attributes= True)
@@ -21,7 +48,10 @@ class downloadOutput(BaseModel):
     duration: int
     uploader: str
     youtube_url: str
-    download_url: str
+    
     createdAt: float
     status: str
-    format: str
+    segments: list[segmentOutput]
+    
+
+

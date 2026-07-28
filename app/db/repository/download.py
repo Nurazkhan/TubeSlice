@@ -1,19 +1,13 @@
 from .base import BaseRepository
-from app.db.schema.download import downloadInstanceIn
-from app.db.models.downloads import DownloadInstance
+from app.db.schema.download import downloadInstanceIn, segmentIn
+from app.db.models.downloads import DownloadInstance, Segment
 
 class downloadRepository(BaseRepository):
     def download(self,payload: downloadInstanceIn):
         new_download = DownloadInstance(
-            title= payload.title,
-            duration = payload.duration,
-            uploader = payload.uploader,
-            youtube_url = payload.youtube_url,
-            download_url = payload.download_url,
-            status = payload.status,
-            user_id = None,
-            format = payload.format
+            **payload.model_dump()
         )
+
         self.session.add(instance=new_download)
         self.session.commit()
         self.session.refresh(instance=new_download)
@@ -38,4 +32,17 @@ class downloadRepository(BaseRepository):
     def get_all_downloads(self):
         return self.session.query(DownloadInstance).all()
 
-        
+class SegmentRepository(BaseRepository):
+    def create_segment(self, payload: segmentIn) -> Segment:
+        new_segment = Segment(**payload.model_dump())
+        self.session.add(instance = new_segment)
+        self.session.commit()
+        self.session.refresh(instance = new_segment)
+        return new_segment
+    def change_status_by_id(self, id: str, status:str) -> Segment:
+        segment = self.session.query(Segment).filter_by(id = id).first()
+        if segment:
+            segment.status = status
+            self.session.commit()
+            self.session.refresh(instance = segment)
+        return segment

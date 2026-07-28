@@ -4,11 +4,11 @@ from typing import Union
 
 class YoutubeAdapter:
     @staticmethod
-    def download(url: str, quality: str = '360p') -> str:
-        path = f'app/downloads/%(title)s.%(ext)s'
+    def download(url: str, path: str, quality: str = '360p' ) -> str:
+       
         ydl_opts: dict[str, Union[str, bool]] = {
             'format': f'{quality}',
-            'outtmpl': path,
+            'outtmpl': f'app/downloads/segments/{segment_id}.%(ext)s',
             'quiet': False,
             'merge_output_format': 'mp4'
         }
