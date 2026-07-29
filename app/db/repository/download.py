@@ -46,3 +46,5 @@ class SegmentRepository(BaseRepository):
             self.session.commit()
             self.session.refresh(instance = segment)
         return segment
+    def get_segment_by_id(self, id:str) -> Segment:
+        return self.session.query(Segment).filter_by(id =id).first()

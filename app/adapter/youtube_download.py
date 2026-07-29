@@ -1,5 +1,5 @@
 import yt_dlp
-from yt_dlp.utils import DownloadError, ExtractorError
+from yt_dlp.utils import DownloadError, ExtractorError, download_range_func
 from typing import Union
 
 class YoutubeAdapter:
@@ -8,7 +8,7 @@ class YoutubeAdapter:
        
         ydl_opts: dict[str, Union[str, bool]] = {
             'format': f'{quality}',
-            'outtmpl': f'app/downloads/segments/{segment_id}.%(ext)s',
+            'outtmpl': path,
             'quiet': False,
             'merge_output_format': 'mp4'
         }
@@ -22,6 +22,27 @@ class YoutubeAdapter:
             return f'Download Failed: {e}' 
         except ExtractorError as e:
             return f'Extraction failed {e}'
+    @staticmethod
+    def download_segment(url: str, path: str, start_time:int, end_time:int, quality: str = 'worstvideo+worstaudio/worst') -> str:
+        ydl_opts: dict[str, Union[str, bool]] = {
+                    'format': f'{quality}',
+                    'download_ranges': download_range_func(None, [(start_time,end_time)]),
+                    'force_keyframes_at_cuts':False,
+                    'outtmpl': path,
+                    'quiet': False,
+                    'merge_output_format': 'mp4'
+                }
+        
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+            return path
+        except DownloadError as e:
+            return f'Download Failed: {e}' 
+        except ExtractorError as e:
+            return f'Extraction failed {e}'
+
        
     @staticmethod
     def get_info(url: str):

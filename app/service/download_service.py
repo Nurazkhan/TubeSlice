@@ -7,25 +7,35 @@ class DownloadService:
     def __init__(self, session : Session):
         self.__downloadRepository = downloadRepository(session = session)
         self.__SegmentRepository = SegmentRepository(session=session)
-    def log_download(self, payload: downloadIn ) -> downloadOutput:
+
+    def preDownload(self, url: str) -> downloadOutput:
         try:
-            info = YoutubeAdapter.get_info(payload.url)
+            info = YoutubeAdapter.get_info(url)
             if not info:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'error extracting info')
             title, duration, uploader, ext = info.get('title'),info.get('duration'),info.get('uploader'), info.get('ext')
-
+            
             payload_to_scheme = downloadInstanceIn(
                 title= title,
                 duration= duration,
                 uploader= uploader,
-                youtube_url = payload.url,
+                youtube_url = url,
                 status= 'Accepted',
             )
 
             result = self.__downloadRepository.download(payload_to_scheme)
-            result = downloadOutput.model_validate(result)
+            return downloadOutput.model_validate(result)
+        except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"error at preDownload: {e}")
+
+    def log_download(self, payload: downloadIn ) -> downloadOutput:
+        try:
+            result = downloadOutput.model_validate(self.__downloadRepository.get_by_id(payload.download_id))
+
             log_scheme = segmentIn(
-                download_id= result.id,
+                download_id= payload.download_id,
                 start_time= 0,
                 end_time = result.duration,
                 format = payload.format,
@@ -38,7 +48,7 @@ class DownloadService:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"error: {e}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"error at log download: {e}")
 
     def log_download_part(self, payload: segmentIn) -> segmentOutput:
         try:
@@ -51,6 +61,9 @@ class DownloadService:
             traceback.print_exc()
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Napisal ya: error at service: log_download_part: {error}")
 
+    def get_segment_by_id(self, id: str)->segmentOutput:
+        segmentORM = self.__SegmentRepository.get_segment_by_id(id)
+        return segmentOutput.model_validate(segmentORM)
     def change_segment_status(self, segment_id: str, status: str)-> segmentOutput:
         segment_orm = self.__SegmentRepository.change_status_by_id(segment_id, status)
         return segmentOutput.model_validate(segment_orm)

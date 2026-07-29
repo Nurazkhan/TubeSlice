@@ -26,6 +26,7 @@ class segmentIn(BaseModel):
 
 class downloadIn(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    download_id: str
     url: str
     format: str
 
