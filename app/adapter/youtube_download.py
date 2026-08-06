@@ -26,6 +26,7 @@ class YoutubeAdapter:
     def download_segment(url: str, path: str, start_time:int, end_time:int, quality: str = 'worstvideo+worstaudio/worst') -> str:
         ydl_opts: dict[str, Union[str, bool]] = {
                     'format': f'{quality}',
+
                     'download_ranges': download_range_func(None, [(start_time,end_time)]),
                     'force_keyframes_at_cuts':False,
                     'outtmpl': path,
