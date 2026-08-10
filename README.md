@@ -11,3 +11,6 @@ running docker
 `uvicorn main:app --port 8080 --reload`
 
 `pip3 install redis celery`
+
+`docker run --name redis -p 6379:6379 -d redis`
+`celery -A app.worker.celery_app worker -l info -P solo`
