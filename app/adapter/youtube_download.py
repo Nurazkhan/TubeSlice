@@ -32,19 +32,47 @@ class YoutubeAdapter:
         return quality_value
 
     @staticmethod
-    def get_info(url: str) -> Optional[Dict[str, Any]]:
-        ydl_opts = {
-            'cookiefile': 'app/cookies.txt',
+    def _build_info_options(use_cookie: bool = True, client_order: Optional[list[str]] = None) -> Dict[str, Any]:
+        clients = client_order or ['android', 'web', 'ios']
+        options: Dict[str, Any] = {
             'skip_download': True,
             'noplaylist': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': clients,
+                }
+            },
+            'quiet': True,
+            'no_warnings': True,
         }
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                return info
-        except Exception as e:
-            print(f"Extraction Error for {url}: {e}")
-            return None
+        if use_cookie and os.path.exists('app/cookies.txt'):
+            options['cookiefile'] = 'app/cookies.txt'
+        return options
+
+    @staticmethod
+    def get_info(url: str) -> Optional[Dict[str, Any]]:
+        strategies = [
+            (True, ['android', 'web', 'ios']),
+            (False, ['android', 'web', 'ios']),
+            (True, ['web', 'android', 'ios']),
+            (False, ['web', 'android', 'ios']),
+        ]
+
+        last_error = None
+        for use_cookie, clients in strategies:
+            ydl_opts = YoutubeAdapter._build_info_options(use_cookie=use_cookie, client_order=clients)
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if info:
+                        return info
+            except Exception as e:
+                last_error = e
+                print(f"Extraction Error for {url}: {e}")
+
+        if last_error:
+            print(f"All extraction attempts failed for {url}: {last_error}")
+        return None
 
     @staticmethod
     def download_segment(
@@ -55,24 +83,40 @@ class YoutubeAdapter:
         quality: str = '360p',
         format_id: Optional[str] = None,
     ) -> bool:
-        if not os.path.dirname(path):
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
 
-        ydl_opts = {
-            'cookiefile': 'app/cookies.txt',
-            'format': YoutubeAdapter.resolve_format_selector(format_id=format_id, quality=quality),
-            'download_ranges': download_range_func(None, [(start_time, end_time)]),
-            'force_keyframes_at_cuts': True,
-            'outtmpl': path,
-            'quiet': False,
-            'merge_output_format': 'mp4',
-        }
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-            return True
-        except Exception as e:
-            print(f"Download Segment Failed: {e}")
-            return False
+        strategies = [
+            (True, ['android', 'web', 'ios']),
+            (False, ['android', 'web', 'ios']),
+            (True, ['web', 'android', 'ios']),
+            (False, ['web', 'android', 'ios']),
+        ]
+
+        last_error = None
+        for use_cookie, clients in strategies:
+            ydl_opts = {
+                'format': YoutubeAdapter.resolve_format_selector(format_id=format_id, quality=quality),
+                'download_ranges': download_range_func(None, [(start_time, end_time)]),
+                'force_keyframes_at_cuts': True,
+                'outtmpl': path,
+                'quiet': False,
+                'merge_output_format': 'mp4',
+                'extractor_args': {
+                    'youtube': {'player_client': clients}
+                },
+            }
+            if use_cookie and os.path.exists('app/cookies.txt'):
+                ydl_opts['cookiefile'] = 'app/cookies.txt'
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+                return True
+            except Exception as e:
+                last_error = e
+                print(f"Download Segment Failed with client set {clients}: {e}")
+
+        print(f"All download attempts failed for {url}: {last_error}")
+        return False
 
 

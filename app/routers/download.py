@@ -1,15 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from typing import Optional
 import os
 
 from app.db.schema.download import (
     UrlRequest, VideoInfoResponse, SliceTaskRequest, TaskOutput, SegmentOutput
 )
+from app.db.schema.user import UserOutput
 from app.service.download_service import DownloadService
 from app.config.database import get_db
+from app.util.protect_route import get_current_user, security_scheme
+from fastapi.security import HTTPAuthorizationCredentials
+from typing import Annotated
 
 download_router = APIRouter(prefix="", tags=["Download"])
+
+
+def optional_current_user(
+    session: Session = Depends(get_db),
+    authorization: Annotated[Optional[HTTPAuthorizationCredentials], Depends(security_scheme)] = None,
+) -> Optional[UserOutput]:
+    if not authorization:
+        return None
+    return get_current_user(session=session, authorization=authorization)
+
 
 @download_router.post("/info", response_model=VideoInfoResponse)
 def get_video_info(payload: UrlRequest, session: Session = Depends(get_db)):
@@ -17,9 +32,24 @@ def get_video_info(payload: UrlRequest, session: Session = Depends(get_db)):
     return DownloadService(session=session).fetch_video_info(payload.url)
 
 @download_router.post("/slice", response_model=TaskOutput)
-def create_slice_task(payload: SliceTaskRequest, session: Session = Depends(get_db)):
+def create_slice_task(
+    payload: SliceTaskRequest,
+    session: Session = Depends(get_db),
+    current_user: Optional[UserOutput] = Depends(optional_current_user),
+):
     """Initiate full video download or slice into segments."""
-    return DownloadService(session=session).create_slice_task(payload)
+    return DownloadService(session=session).create_slice_task(
+        payload,
+        user_id=current_user.id if current_user else None,
+    )
+
+@download_router.get("/my-downloads", response_model=list[TaskOutput])
+def get_my_downloads(
+    session: Session = Depends(get_db),
+    current_user: UserOutput = Depends(get_current_user),
+):
+    """List all download tasks created by the logged-in user."""
+    return DownloadService(session=session).get_user_downloads(current_user.id)
 
 @download_router.get("/status/{task_id}", response_model=TaskOutput)
 def get_task_status(task_id: str, session: Session = Depends(get_db)):
@@ -64,4 +94,4 @@ def download_file(segment_id: str):
 @download_router.get("/all_downloads", response_model=list[TaskOutput])
 def get_all_downloads(session: Session = Depends(get_db)):
     """Retrieve history of all tasks."""
-    return DownloadService(session=session).get_all_tasks()
+    return DownloadService(session=session).get_all_tasks()

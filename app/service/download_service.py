@@ -49,7 +49,7 @@ class DownloadService:
             thumbnail=info.get('thumbnail')
         )
 
-    def create_slice_task(self, payload: SliceTaskRequest) -> TaskOutput:
+    def create_slice_task(self, payload: SliceTaskRequest, user_id: Optional[str] = None) -> TaskOutput:
         info = self.fetch_video_info(payload.url)
 
         new_download = DownloadInstance(
@@ -57,7 +57,8 @@ class DownloadService:
             duration=info.duration,
             uploader=info.uploader,
             youtube_url=info.youtube_url,
-            status='Accepted'
+            status='Accepted',
+            user_id=user_id
         )
         self.__download_repo.session.add(new_download)
         self.__download_repo.session.commit()
@@ -141,5 +142,9 @@ class DownloadService:
 
     def get_all_tasks(self) -> List[TaskOutput]:
         tasks = self.__download_repo.get_all_downloads()
+        return [TaskOutput.model_validate(t) for t in tasks]
+
+    def get_user_downloads(self, user_id: str) -> List[TaskOutput]:
+        tasks = self.__download_repo.get_all_by_user_id(user_id)
         return [TaskOutput.model_validate(t) for t in tasks]
 

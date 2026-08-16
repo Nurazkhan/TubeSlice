@@ -53,6 +53,7 @@ class TaskOutput(BaseModel):
     youtube_url: str
     status: str
     createdAt: float
+    user_id: Optional[str] = None
     segments: List[SegmentOutput] = []
 
     

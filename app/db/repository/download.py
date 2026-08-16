@@ -21,6 +21,9 @@ class downloadRepository(BaseRepository):
     def get_all_downloads(self):
         return self.session.query(DownloadInstance).all()
 
+    def get_all_by_user_id(self, user_id: str):
+        return self.session.query(DownloadInstance).filter_by(user_id=user_id).all()
+
 class SegmentRepository(BaseRepository):
     def change_status_by_id(self, id: str, status: str) -> Segment:
         segment = self.session.query(Segment).filter_by(id=id).first()
@@ -31,4 +34,4 @@ class SegmentRepository(BaseRepository):
         return segment
 
     def get_segment_by_id(self, id: str) -> Segment:
-        return self.session.query(Segment).filter_by(id=id).first()
+        return self.session.query(Segment).filter_by(id=id).first()
