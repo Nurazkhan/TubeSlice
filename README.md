@@ -1,11 +1,21 @@
 # TubeSlice
 
+[FastAPI](https://img.shields.io/badge/FastAPI-009688%3Flogo%3Dfastapi)
+![Redis Badge](https://img.shields.io/badge/Redis-FF4438%3Flogo%3Dredis)
+![PostgreSQL Badge](https://img.shields.io/badge/postgresql-4169E1%3Flogo%3Dpostgresql)
+![celery Badge](https://img.shields.io/badge/Celery-37814A%3Flogo%3Dcelery)
+![Next.js Badge](https://img.shields.io/badge/Next.js-000%3Flogo%3Dnextdotjs)
+![Youtube Badge](https://img.shields.io/badge/Youtube-FF0000%3Flogo%3Dyoutube)
+
+
 A REST API for downloading and slicing YouTube videos by time range and resolution.
 ![alt text](tubeslice1.png)
 
 ## Video
 <video controls src="tubeslice3.mp4" title="Title"></video>
----
+
+
+
 Unfortunately, I can't deploy it due to ToS regulations, and due to absence of funding for vps. Yet You can ran it locally if needed.
 ---
 ---
