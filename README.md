@@ -1,11 +1,12 @@
 # TubeSlice
 
-[FastAPI](https://img.shields.io/badge/FastAPI-009688%3Flogo%3Dfastapi)
-![Redis Badge](https://img.shields.io/badge/Redis-FF4438%3Flogo%3Dredis)
-![PostgreSQL Badge](https://img.shields.io/badge/postgresql-4169E1%3Flogo%3Dpostgresql)
-![celery Badge](https://img.shields.io/badge/Celery-37814A%3Flogo%3Dcelery)
-![Next.js Badge](https://img.shields.io/badge/Next.js-000%3Flogo%3Dnextdotjs)
-![Youtube Badge](https://img.shields.io/badge/Youtube-FF0000%3Flogo%3Dyoutube)
+![FastAPI](https://img.shields.io/badge/FastAPI-333333?logo=fastapi)
+![Redis Badge](https://img.shields.io/badge/Redis-333333?logo=redis)
+![PostgreSQL Badge](https://img.shields.io/badge/PostgreSQL-333333?logo=postgresql)
+![celery Badge](https://img.shields.io/badge/Celery-333333?logo=celery)
+![Next.js Badge](https://img.shields.io/badge/Next.js-333333?logo=nextdotjs)
+![YT Badge](https://img.shields.io/badge/Youtube-333333?logo=youtube)
+
 
 
 A REST API for downloading and slicing YouTube videos by time range and resolution.
