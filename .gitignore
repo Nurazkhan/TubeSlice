@@ -35,3 +35,6 @@ tubeslice_front/.env.*
 *.log
 coverage/
 tubeslice_front/.next/
+
+DEPLOYMENT.md
+DEPLOYMENT.md
