@@ -13,7 +13,8 @@ A REST API for downloading and slicing YouTube videos by time range and resoluti
 ![alt text](tubeslice1.png)
 
 ## Video
-<video controls src="tubeslice3.mp4" title="Title"></video>
+![gif](tubeslice3.gif)
+
 
 
 
