@@ -12,7 +12,7 @@ class UserService:
 
     def signUp(self, payload: UserInSignUp)-> UserOutput:
         if self.__userRepository.user_exist_by_email(payload.email):
-            raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail="User with this email already created")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with this email already created")
         hashed_pw = HashHandler.gen_password_hash(payload.password)
         payload.password = hashed_pw
        
@@ -30,7 +30,8 @@ class UserService:
             else:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail= 'JWT token generation error')
         else:
-            raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail='password incorrect')
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='password incorrect')
+
         
     def get_user_by_id(self, id:str)-> User:
         user = self.__userRepository.get_user_by_id(id)

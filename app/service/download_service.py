@@ -1,86 +1,145 @@
 from sqlalchemy.orm import Session
 from app.db.repository.download import downloadRepository, SegmentRepository
-from app.db.schema.download import downloadIn, downloadInstanceIn, downloadOutput, segmentIn, segmentOutput
+from app.db.schema.download import (
+    VideoInfoResponse, SliceTaskRequest, SliceSegmentRequest, TaskOutput, SegmentOutput, Format
+)
+from app.db.models.downloads import DownloadInstance, Segment
+
 from app.adapter.youtube_download import YoutubeAdapter
 from fastapi import HTTPException, status
+from typing import List, Optional
+from app.logger import logger
+
 class DownloadService:
-    def __init__(self, session : Session):
-        self.__downloadRepository = downloadRepository(session = session)
-        self.__SegmentRepository = SegmentRepository(session=session)
+    def __init__(self, session: Session):
+        self.__download_repo = downloadRepository(session=session)
+        self.__segment_repo = SegmentRepository(session=session)
 
-    def preDownload(self, url: str) -> downloadOutput:
-        try:
-            info = YoutubeAdapter.get_info(url)
-            if not info:
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'error extracting info')
-            title, duration, uploader, ext = info.get('title'),info.get('duration'),info.get('uploader'), info.get('ext')
-            
-            payload_to_scheme = downloadInstanceIn(
-                title= title,
-                duration= duration,
-                uploader= uploader,
-                youtube_url = url,
-                status= 'Accepted',
+    def fetch_video_info(self, url: str) -> VideoInfoResponse:
+        info = YoutubeAdapter.get_info(url)
+        if not info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to extract video details from the provided URL"
             )
 
-            result = self.__downloadRepository.download(payload_to_scheme)
-            return downloadOutput.model_validate(result)
-        except Exception as e:
-                    import traceback
-                    traceback.print_exc()
-                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"error at preDownload: {e}")
-
-    def log_download(self, payload: downloadIn ) -> downloadOutput:
-        try:
-            result = downloadOutput.model_validate(self.__downloadRepository.get_by_id(payload.download_id))
-
-            log_scheme = segmentIn(
-                download_id= payload.download_id,
-                start_time= 0,
-                end_time = result.duration,
-                format = payload.format,
+        formats: list[Format] = []
+        for f in info.get('formats', []):
+            format_id = f.get('format_id')
+            ext = f.get('ext')
+            resolution = f.get('resolution') or (
+                f"{f.get('width')}x{f.get('height')}" if f.get('width') and f.get('height') else 'audio only'
             )
-            result_segment = self.log_download_part(log_scheme)
-            result.segments.append(result_segment)
+            note = f.get('format_note')
+            formats.append(
+                Format(
+                    format_id=str(format_id) if format_id is not None else '',
+                    ext=ext or '',
+                    resolution=resolution,
+                    note=note,
+                )
+            )
 
-            return result
+        return VideoInfoResponse(
+            title=info.get('title', 'Unknown Title'),
+            duration=int(info.get('duration') or 0),
+            uploader=info.get('uploader', 'Unknown Uploader'),
+            youtube_url=url,
+            formats=formats,
+            thumbnail=info.get('thumbnail')
+        )
 
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"error at log download: {e}")
+    def create_slice_task(self, payload: SliceTaskRequest) -> TaskOutput:
+        info = self.fetch_video_info(payload.url)
 
-    def log_download_part(self, payload: segmentIn) -> segmentOutput:
-        try:
-            result = self.__SegmentRepository.create_segment(payload)
-            print(result)
-            return segmentOutput.model_validate(result)
-        except Exception as error:
-            print(error)
-            import traceback
-            traceback.print_exc()
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Napisal ya: error at service: log_download_part: {error}")
+        new_download = DownloadInstance(
+            title=info.title,
+            duration=info.duration,
+            uploader=info.uploader,
+            youtube_url=info.youtube_url,
+            status='Accepted'
+        )
+        self.__download_repo.session.add(new_download)
+        self.__download_repo.session.commit()
+        self.__download_repo.session.refresh(new_download)
 
-    def get_segment_by_id(self, id: str)->segmentOutput:
-        segmentORM = self.__SegmentRepository.get_segment_by_id(id)
-        return segmentOutput.model_validate(segmentORM)
-    def change_segment_status(self, segment_id: str, status: str)-> segmentOutput:
-        segment_orm = self.__SegmentRepository.change_status_by_id(segment_id, status)
-        return segmentOutput.model_validate(segment_orm)
-    def change_status(self, id:str, status: str):
-        return self.__downloadRepository.change_status_by_id(id, status)
+        default_quality = payload.quality or '360p'
+        default_format_id = payload.format_id
+        segments_to_create = payload.segments if payload.segments else [
+            {
+                "start_time": 0,
+                "end_time": info.duration,
+                "format": payload.quality or payload.format_id or "mp4",
+                "quality": default_quality,
+                "format_id": default_format_id,
+            }
+        ]
 
-    def check_if_downloaded(self, id: str) -> downloadOutput:
-        result = self.__downloadRepository.check_by_id(id)
+        created_segments = []
+        from app.tasks.downloadTask import download_segment_process
 
-        if result:
-            instance = self.__downloadRepository.get_by_id(id)
-            instance = downloadOutput.model_validate(instance)
-            return instance
-        else:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID not found in database record")
+        for seg in segments_to_create:
+            if isinstance(seg, SliceSegmentRequest):
+                start_t = seg.start_time
+                end_t = seg.end_time
+                fmt = seg.format or "mp4"
+                quality = seg.quality or payload.quality or '360p'
+                selected_format_id = seg.format_id or payload.format_id
+            else:
+                start_t = seg.get('start_time', 0)
+                end_t = seg.get('end_time', info.duration)
+                fmt = seg.get('format', 'mp4')
+                quality = seg.get('quality') or payload.quality or '360p'
+                selected_format_id = seg.get('format_id') or payload.format_id
 
-    def get_all_downloads(self) -> list[downloadOutput]:
-        result = self.__downloadRepository.get_all_downloads()
-        response = [downloadOutput.model_validate(item) for item in result]
-        return response
+            segment_label = selected_format_id or quality or fmt
+            segment_model = Segment(
+                download_id=new_download.id,
+                start_time=start_t,
+                end_time=end_t,
+                format=segment_label,
+                status='Accepted'
+            )
+
+            self.__segment_repo.session.add(segment_model)
+            self.__segment_repo.session.commit()
+            self.__segment_repo.session.refresh(segment_model)
+
+            download_segment_process.delay(
+                url=payload.url,
+                quality=quality,
+                format_id=selected_format_id,
+                download_id=new_download.id,
+                segment_id=segment_model.id,
+                start_time=start_t,
+                end_time=end_t,
+            )
+
+            created_segments.append(SegmentOutput.model_validate(segment_model))
+
+        task_output = TaskOutput.model_validate(new_download)
+        task_output.segments = created_segments
+        return task_output
+
+    def get_task_by_id(self, task_id: str) -> TaskOutput:
+        task = self.__download_repo.get_by_id(task_id)
+        if not task:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+        return TaskOutput.model_validate(task)
+
+    def get_segment_by_id(self, segment_id: str) -> SegmentOutput:
+        segment = self.__segment_repo.get_segment_by_id(segment_id)
+        if not segment:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Segment not found")
+        return SegmentOutput.model_validate(segment)
+
+    def change_segment_status(self, segment_id: str, new_status: str):
+        return self.__segment_repo.change_status_by_id(segment_id, new_status)
+
+    def change_status(self, download_id: str, new_status: str):
+        return self.__download_repo.change_status_by_id(download_id, new_status)
+
+    def get_all_tasks(self) -> List[TaskOutput]:
+        tasks = self.__download_repo.get_all_downloads()
+        return [TaskOutput.model_validate(t) for t in tasks]
+

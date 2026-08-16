@@ -1,58 +1,60 @@
 from pydantic import BaseModel, ConfigDict
+from typing import Optional, List
+
+class UrlRequest(BaseModel):
+    url: str
 
 
-    
-class segmentOutput(BaseModel):
-    model_config = ConfigDict(from_attributes= True)
+class Format(BaseModel):
+    format_id: str
+    ext: str
+    resolution: str
+    note: str | None
 
-    id: str
-    download_id: str
+class VideoInfoResponse(BaseModel):
+    title: str
+    duration: int
+    uploader: str
+    youtube_url: str
+    formats: list[Format]
+    thumbnail: Optional[str] = None
+
+class SliceSegmentRequest(BaseModel):
     start_time: int
     end_time: int
-    status: str
-    format: str
-    
-    createdAt: float
+    format: Optional[str] = "mp4"
+    quality: Optional[str] = None
+    format_id: Optional[str] = None
 
-class segmentIn(BaseModel):
-    model_config = ConfigDict(from_attributes= True)
-    download_id: str
-    start_time: int
-    end_time: int
-    format: str
+class SliceTaskRequest(BaseModel):
+    url: str
+    quality: Optional[str] = "360p"
+    format_id: Optional[str] = None
+    segments: Optional[List[SliceSegmentRequest]] = None
 
-
-   
-
-class downloadIn(BaseModel):
+class SegmentOutput(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    id: str
     download_id: str
-    url: str
-    format: str
-
-class downloadSegmentIn(BaseModel):
-    url: str
-    segments: list[segmentIn]
-
-class downloadInstanceIn(BaseModel):
-    title: str
-    duration: int
-    uploader: str
-    youtube_url: str
+    start_time: int
+    end_time: int
     status: str
+    format: str
+    createdAt: float
 
-class downloadOutput(BaseModel):
-    model_config = ConfigDict(from_attributes= True)
+class TaskOutput(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
     id: str
     title: str
     duration: int
     uploader: str
     youtube_url: str
-    
-    createdAt: float
     status: str
-    segments: list[segmentOutput]
+    createdAt: float
+    segments: List[SegmentOutput] = []
+
     
 
 

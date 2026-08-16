@@ -14,58 +14,83 @@ Welcome to the **TubeSlice Backend** API documentation. TubeSlice is an asynchro
 
 ---
 
-## 🔄 Recommended Workflow
+## 📱 Frontend Integration Guide (Step-by-Step Flow)
 
-To interact effectively with TubeSlice, follow this standard workflow:
+If you are building the frontend (React, Next.js, Vue, Mobile App, etc.), follow this exact step-by-step sequence to integrate with TubeSlice:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Client
-    participant API as FastAPI Backend
-    participant DB as SQLite DB
-    participant Queue as Celery + Redis
-    participant FS as Local Filesystem
+    actor User
+    participant FE as Frontend Application
+    participant BE as TubeSlice Backend API
+    participant Worker as Celery Worker
 
     rect rgb(240, 248, 255)
-    note right of Client: 1. Authentication (Optional for Public Routes)
-    Client->>API: POST /signup or POST /login
-    API-->>Client: Returns JWT Token
-    end
-
-    rect rgb(255, 250, 240)
-    note right of Client: 2. Pre-Download Check
-    Client->>API: POST /predownload?url={YOUTUBE_URL}
-    API-->>Client: Returns Video Metadata (Title, Duration, Uploader)
+    note over User, BE: Step 1: User Pastes YouTube Link
+    User->>FE: Inputs YouTube URL
+    FE->>BE: POST /info { "url": "https://youtu.be/..." }
+    BE-->>FE: Returns VideoInfo (title, duration, thumbnail, uploader)
+    FE->>User: Displays video preview & slider/inputs for timestamps
     end
 
     rect rgb(245, 255, 250)
-    note right of Client: 3. Initiate Full Video Download or Slicing
-    alt Option A: Download Full Video
-        Client->>API: POST /download (url, format, download_id)
-        API->>DB: Save Download Record (Status: "Accepted")
-        API->>Queue: Dispatch Celery Task `download_process`
-        API-->>Client: Return initial download details
-    else Option B: Download Video Cut/Segments
-        Client->>API: POST /segment (url, list of segments with start_time & end_time)
-        API->>DB: Save Segment Log (Status: "Accepted")
-        API->>Queue: Dispatch Celery Task `download_segment_process`
-        API-->>Client: Return list of created segment entries
-    end
+    note over User, Worker: Step 2: User Requests Download / Slice
+    User->>FE: Clicks "Slice Video" or "Download Full Video"
+    FE->>BE: POST /slice { "url": "...", "quality": "360p", "segments": [{"start_time": 10, "end_time": 45}] }
+    BE->>Worker: Dispatches async Celery task
+    BE-->>FE: Returns Task JSON containing task `id` and segment `id`s
+    FE->>User: Displays loading indicator / progress spinner
     end
 
     rect rgb(255, 245, 245)
-    note right of Client: 4. Poll & Retrieve File
-    loop Poll until status is "Downloaded"
-        Client->>API: GET /download/{id} OR GET /segment/{id}
-        alt Status: Accepted / Processing
-            API-->>Client: Returns status message & progress details
-        else Status: Downloaded
-            API-->>Client: Returns File Stream (Binary stream / .mp4 download)
-        end
+    note over User, BE: Step 3: Polling for Completion
+    loop Every 2–3 seconds until status is "Downloaded" or "Failed"
+        FE->>BE: GET /status/{task_id} (or GET /segment/{segment_id})
+        BE-->>FE: Returns updated status: "Accepted" -> "Processing" -> "Downloaded"
     end
+    end
+
+    rect rgb(255, 250, 205)
+    note over User, BE: Step 4: Download / Video Stream Delivery
+    FE->>User: Renders "Download MP4" button or inline `<video>` player
+    User->>FE: Clicks "Download MP4"
+    FE->>BE: GET /download/{segment_id} (Direct file stream download)
+    BE-->>FE: Serves video binary (.mp4 file)
     end
 ```
+
+### Detailed Frontend Call Sequence:
+
+1. **`POST /info`** *(Step 1: Preview)*
+   - **When to call**: When the user pastes a YouTube URL into your search bar.
+   - **What to send**: `{ "url": "https://www.youtube.com/watch?v=..." }`
+   - **What to do with response**: Use the returned `title`, `duration` (in seconds), and `thumbnail` to populate your UI timeline/slider.
+
+2. **`POST /slice`** *(Step 2: Initiate Download)*
+   - **When to call**: When the user picks start/end timestamps and clicks "Slice & Download".
+   - **What to send**: 
+     ```json
+     {
+       "url": "https://www.youtube.com/watch?v=...",
+       "quality": "360p",
+       "segments": [{ "start_time": 10, "end_time": 45 }]
+     }
+     ```
+   - **What to store**: Store the returned `id` (task ID) and `segments[0].id` (segment ID) in local component state.
+
+3. **`GET /status/{task_id}`** *(Step 3: Progress Polling)*
+   - **When to call**: Start a `setInterval` timer polling every **2 seconds** after calling `/slice`.
+   - **What to check**: Check `status` inside the returned object.
+     - If `"Accepted"` or `"Processing"`: Keep polling.
+     - If `"Downloaded"`: Stop polling timer. Show the Download button or HTML5 `<video>` tag!
+     - If `"Failed"`: Stop polling timer. Display an error message to the user.
+
+4. **`GET /download/{segment_id}`** *(Step 4: Save or Play Video)*
+   - **When to use**: Set this URL as the `src` attribute of an `<a download>` link or HTML5 `<video src="...">` player:
+     ```html
+     <a href="http://127.0.0.1:8080/download/{segment_id}" download>Download MP4</a>
+     ```
 
 ---
 
@@ -85,7 +110,6 @@ Authorization: Bearer <your_jwt_token>
 
 #### `GET /`
 - **Description**: Health check endpoint.
-- **Request Body**: None
 - **Response**:
   ```json
   {
@@ -96,14 +120,6 @@ Authorization: Bearer <your_jwt_token>
 #### `GET /dashboard`
 - **Authentication**: Required (`Bearer <token>`)
 - **Description**: Authenticated user dashboard test route.
-- **Response**:
-  - `200 OK`:
-    ```json
-    {
-      "data": "hi logged in user! here is your data: {'id': '...', 'first_name': '...', 'last_name': '...', 'email': '...', 'role': '...'}"
-    }
-    ```
-  - `401 Unauthorized`: Token missing, invalid, or expired.
 
 ---
 
@@ -149,186 +165,145 @@ Authorization: Bearer <your_jwt_token>
 
 ---
 
-### 3. User Management Routes (`/users`, `/delete`)
+### 3. Video Download & Slicing Routes
 
-#### `GET /users`
-- **Description**: Fetches all registered users.
-- **Request Body**: None
-- **Response** (`200 OK`):
-  ```json
-  [
-    {
-      "id": "uuid-v4-string",
-      "first_name": "John",
-      "last_name": "Doe",
-      "email": "john.doe@example.com",
-      "role": "user"
-    }
-  ]
-  ```
-  *Or if empty:*
+#### `POST /info`
+- **Description**: Fetches video metadata and all available download formats without creating DB records or downloading files.
+- **Request Body**:
   ```json
   {
-    "message": "there are no users in database"
-  }
-  ```
-
-#### `DELETE /delete`
-- **Description**: Deletes a user by their ID.
-- **Query Parameters**:
-  - `id` (string, required): The target user's UUID.
-- **Response** (`200 OK`):
-  ```json
-  {
-    "id": "uuid-v4-string",
-    "first_name": "John",
-    "last_name": "Doe",
-    "email": "john.doe@example.com",
-    "role": "user"
-  }
-  ```
-
----
-
-### 4. Download & Slicing Routes (Tags: `Download`)
-
-#### `POST /predownload`
-- **Description**: Fetches video metadata without starting a download.
-- **Query Parameters**:
-  - `url` (string, required): The YouTube video URL.
-- **Response** (`200 OK`):
-  ```json
-  {
-    "msg": "{'title': 'Video Title', 'duration': 300, 'uploader': 'Channel Name', 'youtube_url': 'https://www.youtube.com/watch?v=...'}"
-  }
-  ```
-
-#### `POST /download`
-- **Description**: Logs a download request and queues a background task to download the full video.
-- **Request Body** (`application/json`):
-  ```json
-  {
-    "download_id": "unique-client-or-generated-id",
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "format": "mp4"
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
   }
   ```
 - **Response** (`200 OK`):
   ```json
   {
-    "message": "download info: id='...' title='...' duration=... uploader='...' status='Accepted' segments=[...]"
+    "title": "Rick Astley - Never Gonna Give You Up",
+    "duration": 212,
+    "uploader": "Rick Astley",
+    "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+    "formats": [
+      { "format_id": "18", "ext": "mp4", "resolution": "640x360", "note": "360p" },
+      { "format_id": "22", "ext": "mp4", "resolution": "1280x720", "note": "720p" },
+      { "format_id": "136", "ext": "mp4", "resolution": "1280x720", "note": "720p" },
+      { "format_id": "251", "ext": "webm", "resolution": "audio only", "note": "medium" }
+    ]
   }
   ```
+- **Usage**: The frontend can render the `formats` array and let the user choose a target resolution. The `format_id` is the exact yt-dlp stream identifier, and `quality` is a convenience label like `360p` or `720p`.
 
-#### `POST /segment`
-- **Description**: Requests one or multiple specific timestamp slices/segments of a YouTube video.
-- **Request Body** (`application/json`):
+#### `POST /slice`
+- **Description**: Creates a download task for either a full video or multiple cut time slices. You can request a concrete `format_id` or a `quality` preset.
+- **Request Body**:
   ```json
   {
     "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "quality": "720p",
+    "format_id": "136",
+    "segments": [
+      { "start_time": 10, "end_time": 45 }
+    ]
+  }
+  ```
+  - `format_id` is the most precise option because it selects the exact yt-dlp stream.
+  - `quality` is also supported as a fallback such as `360p`, `480p`, `720p`.
+  - If both are provided, `format_id` takes precedence.
+  - If `segments` is omitted, defaults to full video 0 -> video duration.
+- **Response** (`200 OK`):
+  ```json
+  {
+    "id": "task-uuid",
+    "title": "Rick Astley - Never Gonna Give You Up",
+    "duration": 212,
+    "uploader": "Rick Astley",
+    "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "status": "Accepted",
+    "createdAt": 1723300000.0,
     "segments": [
       {
-        "download_id": "existing-or-target-download-id",
+        "id": "segment-uuid",
+        "download_id": "task-uuid",
         "start_time": 10,
         "end_time": 45,
-        "format": "mp4"
+        "status": "Accepted",
+        "format": "136",
+        "createdAt": 1723300000.0
       }
     ]
   }
   ```
-- **Response** (`200 OK`):
-  ```json
-  {
-    "msg": "[segmentOutput(id='segment-uuid', download_id='...', start_time=10, end_time=45, status='Accepted', format='mp4', createdAt=1723300000.0)]"
-  }
-  ```
 
-#### `GET /download/{id}`
-- **Description**: Checks status of a download task. Returns status message if processing/pending, or Streams/Downloads the resulting `.mp4` file if completed.
-- **Path Parameters**:
-  - `id` (string, required): Download ID.
-- **Response**:
-  - **When Pending/Accepted**:
-    ```json
-    {
-      "message": "Not downloaded yet \n full info here: <DownloadObject>"
-    }
-    ```
-  - **When Downloaded (Single Segment/Full Video)**:
-    - Headers: `Content-Type: application/octet-stream`
-    - Body: Binary `.mp4` video stream.
+#### `GET /status/{task_id}`
+- **Description**: Check status of a download task. Returns status (`Accepted`, `Processing`, `Downloaded`, `Failed`).
 
-#### `GET /segment/{id}`
-- **Description**: Checks status of a specific segment download. Streams/downloads the segmented file when ready.
-- **Path Parameters**:
-  - `id` (string, required): Segment ID.
-- **Response**:
-  - **Status: `Accepted`**:
-    ```json
-    {
-      "message": "Your task is accepted wait until its ready",
-      "data": "<SegmentObject>"
-    }
-    ```
-  - **Status: `Processing`**:
-    ```json
-    {
-      "message": "Your task is being downloaded wait",
-      "data": "<SegmentObject>"
-    }
-    ```
-  - **Status: `Downloaded`**:
-    - Headers: `Content-Type: application/stream-octet`
-    - Body: Binary `.mp4` video stream for segment `{id}.mp4`.
+#### `GET /segment/{segment_id}`
+- **Description**: Returns segment status details if processing, or streams the `.mp4` video binary if completed.
+
+#### `GET /download/{segment_id}`
+- **Description**: Direct stream/download link for an existing `.mp4` segment file.
 
 #### `GET /all_downloads`
-- **Description**: Retrieves all recorded downloads and their segments.
-- **Request Body**: None
-- **Response** (`200 OK`):
-  ```json
-  [
-    {
-      "id": "download-id",
-      "title": "Video Title",
-      "duration": 300,
-      "uploader": "Uploader Name",
-      "youtube_url": "https://www.youtube.com/watch?v=...",
-      "createdAt": 1723300000.0,
-      "status": "Downloaded",
-      "segments": [
-        {
-          "id": "segment-id",
-          "download_id": "download-id",
-          "start_time": 0,
-          "end_time": 300,
-          "status": "Downloaded",
-          "format": "mp4",
-          "createdAt": 1723300000.0
-        }
-      ]
-    }
-  ]
-  ```
+- **Description**: Retrieves history of all created tasks and segments.
+
+---
+
+## ⚡ Resolution selection behavior
+
+The backend now supports all downloadable video resolutions returned by yt-dlp.
+
+- `GET /info` returns the list of available `formats`.
+- Frontend clients can display each option using `resolution`, `ext`, and `note`.
+- `POST /slice` accepts either a `quality` string or a specific `format_id`.
+- The worker resolves the exact yt-dlp selector before downloading the chosen time range.
+
+### Example frontend usage
+
+```json
+{
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "format_id": "136",
+  "segments": [{ "start_time": 0, "end_time": 30 }]
+}
+```
+
+or
+
+```json
+{
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "quality": "720p",
+  "segments": [{ "start_time": 0, "end_time": 30 }]
+}
+```
+
+This allows the API to download the exact user-selected resolution instead of only a generic default quality.
+
+#### `GET /status/{task_id}`
+- **Description**: Check status of a download task. Returns status (`Accepted`, `Processing`, `Downloaded`, `Failed`).
+
+#### `GET /segment/{segment_id}`
+- **Description**: Returns segment status details if processing, or streams the `.mp4` video binary if completed.
+
+#### `GET /download/{segment_id}`
+- **Description**: Direct stream/download link for an existing `.mp4` segment file.
+
+#### `GET /all_downloads`
+- **Description**: Retrieves history of all created tasks and segments.
 
 ---
 
 ## ⚡ Background Workers & Running locally
 
 ### 1. Start Redis
-Ensure Redis server is running locally on default port `6379`.
+Ensure Redis server is running on default port `6379`.
 
 ### 2. Start Celery Worker
-Run the Celery worker process from the project root:
 ```bash
-celery -A app.worker.celery worker --loglevel=info -P solo
+celery -A app.worker.celery_app worker -l info -P solo
 ```
 
 ### 3. Start FastAPI Server
-Run the FastAPI development server:
 ```bash
-python main.py
-```
-Or via uvicorn directly:
-```bash
-uvicorn main:app --reload --host 127.0.0.1 --port 8000
+uvicorn main:app --reload --port 8080
 ```
