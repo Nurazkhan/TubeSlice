@@ -30,8 +30,3 @@ class Segment(Base):
 
     download = relationship("DownloadInstance", back_populates="segments")
 
-# -- RELATIONSHIP meaning # # Get all segments belonging to this download
-# all_segments = my_download.segments  
-
-# # Get the main download details from a segment object
-# parent_download = my_segment.download  

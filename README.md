@@ -173,6 +173,16 @@ The frontend will be available at **http://localhost:3000**
 
 The architecture separates metadata extraction (synchronous info calls) from actual downloads (queued tasks). Each user's downloads are isolated and queryable via authenticated endpoints.
 
+## Deployment
+
+For production deployment on a VPS or cloud server, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Quick summary:
+- Backend runs on Linux VPS with systemd services
+- PostgreSQL + Redis in Docker containers
+- Nginx reverse proxy for HTTP/HTTPS
+- Frontend hosted on Vercel connecting to VPS API
+
 ## Credits
 
 Built with:

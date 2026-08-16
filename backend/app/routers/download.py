@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -95,3 +95,95 @@ def download_file(segment_id: str):
 def get_all_downloads(session: Session = Depends(get_db)):
     """Retrieve history of all tasks."""
     return DownloadService(session=session).get_all_tasks()
+
+
+@download_router.post("/cookies")
+async def upload_cookies(
+    file: UploadFile = File(...),
+    current_user: UserOutput = Depends(get_current_user),
+):
+    """Upload or update cookies.txt file for YouTube extraction.
+    
+    Only authenticated users can upload cookies.
+    The cookies file is used to bypass age verification and other YouTube restrictions.
+    
+    Args:
+        file: A Netscape format cookies.txt file
+        
+    Returns:
+        Success message with file details
+    """
+    if file.filename != "cookies.txt":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be named 'cookies.txt'"
+        )
+    
+    if file.content_type not in [None, "text/plain", "application/octet-stream"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be a text file"
+        )
+    
+    try:
+   
+        content = await file.read()
+        
+   
+        if len(content) > 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Cookies file is too large (max 1MB)"
+            )
+        
+     
+        cookies_path = os.path.join("app", "cookies.txt")
+        os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
+        
+
+        with open(cookies_path, "wb") as f:
+            f.write(content)
+        
+        return {
+            "message": "Cookies file updated successfully",
+            "file_size": len(content),
+            "path": cookies_path,
+            "updated_by": current_user.email
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save cookies file: {str(e)}"
+        )
+
+
+@download_router.delete("/cookies")
+async def delete_cookies(current_user: UserOutput = Depends(get_current_user)):
+    """Delete the cookies.txt file.
+    
+    Only authenticated users can delete cookies.
+    This will fall back to yt-dlp's default behavior for YouTube extraction.
+    """
+    try:
+        cookies_path = os.path.join("app", "cookies.txt")
+        
+        if os.path.exists(cookies_path):
+            os.remove(cookies_path)
+            return {
+                "message": "Cookies file deleted successfully",
+                "deleted_by": current_user.email
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cookies file does not exist"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete cookies file: {str(e)}"
+        )
