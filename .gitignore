@@ -1,18 +1,37 @@
+# Environment files
 .env
+.env.*
+!.env.example
+
+# Python virtual env and caches
 .venv/
-
-
-
-
+venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 **/__pycache__/
 */__pycache__/
-__pycache__/test/downloads/
+
+# Backend generated output / local data
 app/downloads/
-
 test/downloads/
-
+backend/app/downloads/
+backend/test/downloads/
+backend/app/cookies.txt
 app/cookies.txt
+
+# Frontend local app data
+node_modules/
+tubeslice_front/node_modules/
+tubeslice_front/.next/
+tubeslice_front/.turbo/
+tubeslice_front/.env
+tubeslice_front/.env.*
+!tubeslice_front/.env.example
+
+# General local tooling files
+.DS_Store
+*.log
+coverage/
+tubeslice_front/.next/

@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --background: #f9fafb;
+  --foreground: #18181b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.11), transparent 25rem),
+    radial-gradient(circle at 10% 24%, rgba(190, 18, 60, 0.07), transparent 22rem),
+    linear-gradient(180deg, #ffffff 0%, var(--background) 34%, #eef2f7 100%);
+  color: var(--foreground);
+  font-family: Geist, Satoshi, "Cabinet Grotesk", Arial, sans-serif;
+  letter-spacing: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.surface-grid {
+  background-image:
+    linear-gradient(rgba(24, 24, 27, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(24, 24, 27, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+.shimmer {
+  background: linear-gradient(110deg, #eef2f7 8%, #ffffff 18%, #eef2f7 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+.float-slow {
+  animation: floatSlow 6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.pulse-dot {
+  animation: pulseDot 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+
+@keyframes floatSlow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.82;
+  }
+  50% {
+    transform: scale(1.38);
+    opacity: 0.42;
+  }
+}
