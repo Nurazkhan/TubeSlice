@@ -1,0 +1,6 @@
+● tubeslice-celery.service - TubeSlice Celery Worker
+     Loaded: loaded (]8;;file://vm4046962.firstbyte.club/etc/systemd/system/tubeslice-celery.service/etc/systemd/system/tubeslice-celery.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: activating (auto-restart) (Result: exit-code) since Sun 2026-08-16 14:47:30 UTC; 4s ago
+    Process: 589324 ExecStart=/opt/TubeSlice/backend/.venv/bin/celery -A app.worker.celery_app worker -l info [0;1;31m(code=exited, status=203/EXEC)[0m
+   Main PID: 589324 (code=exited, status=203/EXEC)
+        CPU: 2ms
