@@ -68,6 +68,11 @@ const getFormatPayload = (formats: VideoFormat[], formatId: string, supportsExac
   };
 };
 
+const isStoryboardFormat = (format?: VideoFormat) => {
+  if (!format) return false;
+  return [format.format_id, format.ext, format.resolution, format.note].some((value) => value?.toLowerCase().includes("storyboard"));
+};
+
 function FormatSelect({
   label,
   value,
@@ -319,6 +324,7 @@ export default function TubeSliceApp() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
   useEffect(() => {
     const savedToken = window.localStorage.getItem("tubeslice_token");
@@ -333,7 +339,23 @@ export default function TubeSliceApp() {
     const formats = metadata?.formats?.filter((format) => format.format_id) ?? [];
     return formats.length > 0 ? formats : fallbackFormats;
   }, [metadata]);
+  const segmentFormats = useMemo(() => {
+    const formats = availableFormats.filter((format) => !isStoryboardFormat(format));
+    return formats.length > 0 ? formats : fallbackFormats;
+  }, [availableFormats]);
   const supportsExactFormats = Boolean(metadata?.formats?.some((format) => format.format_id));
+
+  const showError = (message: string) => {
+    setError(message);
+    setToast(message);
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+
+    const timeout = window.setTimeout(() => setToast(""), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
   const authenticate = (nextToken: string, nextUser?: User) => {
     window.localStorage.setItem("tubeslice_token", nextToken);
@@ -356,18 +378,20 @@ export default function TubeSliceApp() {
       const result = await api.info(url.trim(), token);
       const nextFormats = result.formats?.filter((format) => format.format_id) ?? [];
       const nextFormatId = nextFormats[0]?.format_id ?? "360p";
+      const nextSegmentFormats = nextFormats.filter((format) => !isStoryboardFormat(format));
+      const nextSegmentFormat = nextSegmentFormats[0] ?? fallbackFormats[0];
       setMetadata(result);
       setFullFormatId(nextFormatId);
       setSegments((current) =>
         current.map((segment) => ({
           ...segment,
-          quality: nextFormats[0]?.note || nextFormats[0]?.resolution || "360p",
-          format_id: nextFormatId,
+          quality: nextSegmentFormat.note || nextSegmentFormat.resolution || "360p",
+          format_id: nextSegmentFormat.format_id,
         })),
       );
       setNotice("Video metadata loaded from the backend.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not inspect this URL");
+      showError(caught instanceof Error ? caught.message : "Could not inspect this URL");
     } finally {
       setIsInspecting(false);
     }
@@ -398,7 +422,7 @@ export default function TubeSliceApp() {
       ]);
       setNotice("Full video request accepted by the backend.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Download request failed");
+      showError(caught instanceof Error ? caught.message : "Download request failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -410,6 +434,14 @@ export default function TubeSliceApp() {
     setNotice("");
 
     try {
+      const storyboardSegment = segments.find((segment) =>
+        isStoryboardFormat(availableFormats.find((format) => format.format_id === (segment.format_id || segment.quality))),
+      );
+
+      if (storyboardSegment) {
+        throw new Error("Storyboard formats cannot be used for segment downloads.");
+      }
+
       const results = await Promise.all(
         segments.map((segment) => {
           const payload = getFormatPayload(availableFormats, segment.format_id || segment.quality, supportsExactFormats);
@@ -444,7 +476,7 @@ export default function TubeSliceApp() {
       ]);
       setNotice(`${results.length} segment request${results.length === 1 ? "" : "s"} accepted by the backend.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Segment request failed");
+      showError(caught instanceof Error ? caught.message : "Segment request failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -452,7 +484,9 @@ export default function TubeSliceApp() {
 
   const pollJob = async (job: DownloadJob) => {
     setError("");
-    setJobs((current) => current.map((item) => (item.id === job.id ? { ...item, status: "Processing" } : item)));
+    setJobs((current) =>
+      current.map((item) => (item.id === job.id ? { ...item, status: "Processing", message: "Downloading..." } : item)),
+    );
 
     try {
       const result = await api.status(job.id, token);
@@ -475,11 +509,13 @@ export default function TubeSliceApp() {
         ),
       );
     } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Polling failed";
       setJobs((current) =>
         current.map((item) =>
-          item.id === job.id ? { ...item, status: "Error", message: caught instanceof Error ? caught.message : "Polling failed" } : item,
+          item.id === job.id ? { ...item, status: "Error", message } : item,
         ),
       );
+      showError(message);
     }
   };
 
@@ -512,13 +548,15 @@ export default function TubeSliceApp() {
             );
           })
           .catch((caught) => {
+            const message = caught instanceof Error ? caught.message : "Polling failed";
             setJobs((current) =>
               current.map((item) =>
                 item.id === job.id
-                  ? { ...item, status: "Error", message: caught instanceof Error ? caught.message : "Polling failed" }
+                  ? { ...item, status: "Error", message }
                   : item,
               ),
             );
+            showError(message);
           });
       });
     }, 2000);
@@ -533,7 +571,7 @@ export default function TubeSliceApp() {
   };
 
   const updateSegmentFormat = (localId: string, formatId: string) => {
-    const selectedFormat = availableFormats.find((format) => format.format_id === formatId);
+    const selectedFormat = segmentFormats.find((format) => format.format_id === formatId);
     setSegments((current) =>
       current.map((segment) =>
         segment.localId === localId
@@ -550,6 +588,12 @@ export default function TubeSliceApp() {
   return (
     <main className="relative min-h-[100dvh] overflow-hidden px-4 py-5 text-zinc-950 sm:px-6 lg:px-8">
       <div className="surface-grid pointer-events-none absolute inset-0" />
+      {toast ? (
+        <div className="fixed right-4 top-4 z-50 flex max-w-sm items-start gap-3 rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm text-rose-800 shadow-diffusion">
+          <WarningCircle size={18} weight={iconWeight} className="mt-0.5 shrink-0" />
+          <span>{toast}</span>
+        </div>
+      ) : null}
 
       <div className="relative mx-auto max-w-[1400px]">
         <nav className="flex items-center justify-between gap-4 py-3">
@@ -732,8 +776,8 @@ export default function TubeSliceApp() {
                       start_time: current.length * 30,
                       end_time: current.length * 30 + 30,
                       format: "mp4",
-                      quality: availableFormats[0]?.note || availableFormats[0]?.resolution || "360p",
-                      format_id: availableFormats[0]?.format_id || "360p",
+                      quality: segmentFormats[0]?.note || segmentFormats[0]?.resolution || "360p",
+                      format_id: segmentFormats[0]?.format_id || "360p",
                     },
                   ])
                 }
@@ -777,7 +821,7 @@ export default function TubeSliceApp() {
                     <FormatSelect
                       label="Segment format"
                       value={segment.format_id || segment.quality}
-                      formats={availableFormats}
+                      formats={segmentFormats}
                       onChange={(value) => updateSegmentFormat(segment.localId, value)}
                     />
                   </div>
