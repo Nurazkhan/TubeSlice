@@ -4,8 +4,8 @@
 
 :root {
   color-scheme: light;
-  --background: #f9fafb;
-  --foreground: #18181b;
+  --background: #f5f3ef;
+  --foreground: #1c1917;
 }
 
 * {
@@ -20,11 +20,12 @@ body {
   min-height: 100dvh;
   margin: 0;
   background:
-    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.11), transparent 25rem),
-    radial-gradient(circle at 10% 24%, rgba(190, 18, 60, 0.07), transparent 22rem),
-    linear-gradient(180deg, #ffffff 0%, var(--background) 34%, #eef2f7 100%);
+    linear-gradient(rgba(28, 25, 23, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28, 25, 23, 0.035) 1px, transparent 1px),
+    var(--background);
+  background-size: 32px 32px;
   color: var(--foreground);
-  font-family: Geist, Satoshi, "Cabinet Grotesk", Arial, sans-serif;
+  font-family: var(--font-geist-sans), Arial, sans-serif;
   letter-spacing: 0;
 }
 
@@ -38,52 +39,65 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-.surface-grid {
-  background-image:
-    linear-gradient(rgba(24, 24, 27, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(24, 24, 27, 0.05) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: linear-gradient(to bottom, black, transparent 82%);
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #1c1917;
+  outline-offset: 2px;
 }
 
-.shimmer {
-  background: linear-gradient(110deg, #eef2f7 8%, #ffffff 18%, #eef2f7 33%);
-  background-size: 200% 100%;
-  animation: shimmer 1.35s ease-in-out infinite;
+.panel {
+  border: 1px solid rgba(214, 211, 209, 0.9);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 42px -30px rgba(68, 64, 60, 0.7);
+  padding: 1.25rem;
 }
 
-.float-slow {
-  animation: floatSlow 6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #78716c;
 }
 
-.pulse-dot {
-  animation: pulseDot 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+.icon-button {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: #1c1917;
+  color: white;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease;
 }
 
-@keyframes shimmer {
-  to {
-    background-position-x: -200%;
-  }
+.icon-button:hover {
+  background: #44403c;
 }
 
-@keyframes floatSlow {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -10px, 0);
-  }
+.icon-button:active {
+  transform: translateY(1px);
 }
 
-@keyframes pulseDot {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.82;
-  }
-  50% {
-    transform: scale(1.38);
-    opacity: 0.42;
+.icon-button.muted {
+  border: 1px solid #d6d3d1;
+  background: white;
+  color: #78716c;
+}
+
+.icon-button.muted:hover {
+  background: #fafaf9;
+  color: #b91c1c;
+}
+
+@media (min-width: 640px) {
+  .panel {
+    padding: 1.5rem;
   }
 }
